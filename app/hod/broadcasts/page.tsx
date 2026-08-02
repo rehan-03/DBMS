@@ -4,9 +4,9 @@ import { getSession, signOut } from "next-auth/react";
 
 import React, { useState, useEffect } from "react";
 import { motion, Variants, AnimatePresence } from "framer-motion";
-import { Megaphone, Send, Clock, Users, CheckCircle2, Paperclip, X, Link as LinkIcon, Image as ImageIcon, FileText, ExternalLink, Pin, AlertCircle, CalendarClock, ListChecks } from "lucide-react";
+import { Megaphone, Send, Clock, Users, CheckCircle2, Paperclip, X, Link as LinkIcon, Image as ImageIcon, FileText, ExternalLink, Pin, AlertCircle, CalendarClock, ListChecks, Trash2 } from "lucide-react";
 import { supabase } from "@/app/student/supabase";
-import { createBroadcast } from "@/app/actions/broadcasts";
+import { createBroadcast, deleteBroadcast } from "@/app/actions/broadcasts";
 import { fetchMyHodProfile } from "@/app/actions/reads";
 
 export default function BroadcastsPage() {
@@ -30,6 +30,12 @@ export default function BroadcastsPage() {
   const [rsvpOptions, setRsvpOptions] = useState("Yes, No");
 
   const [sending, setSending] = useState(false);
+  const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
 
   useEffect(() => {
     fetchData();
@@ -80,12 +86,12 @@ export default function BroadcastsPage() {
   const handleSendBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hodData) {
-      alert("HOD profile not loaded correctly. Please refresh the page.");
+      showToast("HOD profile not loaded correctly. Please refresh the page.", "error");
       return;
     }
     
     if (!title.trim() || !message.trim()) {
-      alert("Please fill out both the title and message.");
+      showToast("Please fill out both the title and message.", "error");
       return;
     }
 
@@ -145,6 +151,10 @@ export default function BroadcastsPage() {
 
       const result = await createBroadcast(newBroadcast);
 
+      if (!result.success) {
+        throw new Error(result.error || "An unknown error occurred on the server.");
+      }
+
       if (result.success && result.data) {
         // Add new broadcast to the top of the local list
         setBroadcasts([result.data, ...broadcasts].sort((a,b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0)));
@@ -163,10 +173,27 @@ export default function BroadcastsPage() {
       setHasRsvp(false);
       setRsvpOptions("Yes, No");
       
-      alert("Broadcast sent successfully!");
+      showToast("Broadcast sent successfully!", "success");
       
     } catch (error: any) {
-      alert("Error sending broadcast: " + error.message);
+      showToast("Error sending broadcast: " + error.message, "error");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleDeleteBroadcast = async (broadcastId: string) => {
+    if (!confirm("Are you sure you want to delete this broadcast? This action cannot be undone.")) return;
+    
+    setSending(true);
+    try {
+      const result = await deleteBroadcast(broadcastId);
+      if (!result.success) throw new Error(result.error || "Failed to delete broadcast");
+      
+      setBroadcasts(broadcasts.filter(b => b.id !== broadcastId));
+      showToast("Broadcast deleted successfully!", "success");
+    } catch (error: any) {
+      showToast("Error deleting broadcast: " + error.message, "error");
     } finally {
       setSending(false);
     }
@@ -186,7 +213,29 @@ export default function BroadcastsPage() {
   if (!hodData) return <div className="text-rose-500 font-medium">Error: HOD Profile not found. Please log in again.</div>;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10">
+    <div className="max-w-6xl mx-auto space-y-10 relative">
+      
+      {/* --- Toast Notification --- */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl border ${
+              toast.type === 'success' 
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                : 'bg-rose-50 border-rose-200 text-rose-800'
+            }`}
+          >
+            {toast.type === 'success' ? <CheckCircle2 size={24} className="text-emerald-500" /> : <AlertCircle size={24} className="text-rose-500" />}
+            <span className="font-medium text-sm pr-4">{toast.message}</span>
+            <button onClick={() => setToast(null)} className="absolute top-2 right-2 text-slate-400 hover:text-slate-700">
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* --- Header --- */}
       <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="mb-10">
@@ -440,8 +489,13 @@ export default function BroadcastsPage() {
                   </div>
                 )}
 
-                <div className="mt-4 pt-4 border-t border-slate-200/50 flex items-center gap-1 text-[10px] uppercase tracking-widest text-[#10B981] font-bold">
-                  <CheckCircle2 size={14} /> Sent by {b.created_by}
+                <div className="mt-4 pt-4 border-t border-slate-200/50 flex items-center justify-between">
+                  <div className="flex items-center gap-1 text-[10px] uppercase tracking-widest text-[#10B981] font-bold">
+                    <CheckCircle2 size={14} /> Sent by {b.created_by}
+                  </div>
+                  <button onClick={() => handleDeleteBroadcast(b.id)} disabled={sending} className="text-slate-400 hover:text-rose-500 transition-colors p-1.5 rounded-full hover:bg-rose-50 disabled:opacity-50" title="Delete Broadcast">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </motion.div>
             ))
