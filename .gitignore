@@ -1,0 +1,10 @@
+.venv/
+.tools/
+.env
+.env.admin
+instance/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.taste-skill/
+docs/evidence/generated/
