@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.local.example
 
 # vercel
 .vercel
@@ -42,3 +43,9 @@ next-env.d.ts
 
 # scratch / local dev scripts (may contain hardcoded secrets)
 /scratch
+
+# Local credentials, database files, and generated visual checks
+*credentials*.env
+/.taste-skill/
+/instance/
+*.log

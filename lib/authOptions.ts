@@ -16,59 +16,35 @@ export const authOptions: AuthOptions = {
           throw new Error("Missing UID or password");
         }
         
-        const uid = credentials.uid.toUpperCase();
+        const uid = credentials.uid.trim().toUpperCase();
         const password = credentials.password;
 
-        // 1. Check Students
-        const { data: student } = await supabaseServer
-          .from("students")
-          .select("uid, name, department_id, password")
-          .ilike("uid", uid)
-          .single();
-          
-        if (student && student.password) {
-          // Support both bcrypt hashes and legacy plain-text passwords
-          const isMatch = student.password.startsWith('$2')
-            ? await bcrypt.compare(password, student.password)
-            : student.password === password;
-          if (isMatch) {
-            return { id: student.uid, name: student.name, role: "student", department_id: student.department_id };
-          }
+        const accounts = [
+          { table: "students", key: "uid", role: "student" },
+          { table: "staff", key: "suid", role: "staff" },
+          { table: "hods", key: "huid", role: "hod" },
+        ];
+        const results = await Promise.all(accounts.map(account =>
+          supabaseServer.from(account.table)
+            .select(account.key + ", name, department_id, password")
+            .ilike(account.key, uid).maybeSingle()
+        ));
+        if (results.every(result => result.error)) {
+          throw new Error("The database is temporarily unavailable. Please try again.");
+        }
+        for (let index = 0; index < accounts.length; index++) {
+          const account = accounts[index];
+          const record = results[index].data;
+          if (!record?.password) continue;
+          const matches = record.password.startsWith("$2")
+            ? await bcrypt.compare(password, record.password)
+            : record.password === password;
+          if (matches) return {
+            id: record[account.key], name: record.name,
+            role: account.role, department_id: record.department_id,
+          };
         }
 
-        // 2. Check Staff
-        const { data: staff } = await supabaseServer
-          .from("staff")
-          .select("suid, name, department_id, password")
-          .ilike("suid", uid)
-          .single();
-          
-        if (staff && staff.password) {
-          const isMatch = staff.password.startsWith('$2')
-            ? await bcrypt.compare(password, staff.password)
-            : staff.password === password;
-          if (isMatch) {
-            return { id: staff.suid, name: staff.name, role: "staff", department_id: staff.department_id };
-          }
-        }
-
-        // 3. Check HODs
-        const { data: hod } = await supabaseServer
-          .from("hods")
-          .select("huid, name, department_id, password")
-          .ilike("huid", uid)
-          .single();
-          
-        if (hod && hod.password) {
-          const isMatch = hod.password.startsWith('$2')
-            ? await bcrypt.compare(password, hod.password)
-            : hod.password === password;
-          if (isMatch) {
-            return { id: hod.huid, name: hod.name, role: "hod", department_id: hod.department_id };
-          }
-        }
-
-        // If nothing matched
         throw new Error("Invalid UID or password");
       }
     })

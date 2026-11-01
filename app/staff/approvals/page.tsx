@@ -1,11 +1,13 @@
 "use client";
-import { getSession, signOut } from "next-auth/react";
+import { signOut } from "next-auth/react";
+import { getSession } from "@/lib/client-session";
 
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, XCircle, Clock, MapPin, Calendar, FileText, UserCircle, Send, MessageSquare } from "lucide-react";
 import { supabase } from "@/app/student/supabase";
+import { startActivityRefresh } from "@/lib/activity-refresh";
 import { approveStudentActivity } from "@/app/actions/activities";
 import { fetchStudentsByUids } from "@/app/actions/reads";
 
@@ -125,11 +127,14 @@ export default function PriorityQueuePage() {
           };
         });
         setRequests(mapped);
+      } else {
+        setRequests([]);
       }
       setLoading(false);
     }
-    
+
     fetchPendingRequests();
+    return startActivityRefresh(fetchPendingRequests);
   }, []);
 
   const handleAction = async (reactKey: string, action: "approve" | "reject", currentStatus: string) => {
@@ -169,18 +174,18 @@ export default function PriorityQueuePage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      
+
       {/* --- Header --- */}
       <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-slate-800 tracking-tight">
-            Priority <span className="text-[#60A5FA]">Queue</span>
-          </h2>
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-slate-800 tracking-tight">
+            Priority <span className="text-[#17685E]">Queue</span>
+          </h1>
           <p className="text-slate-500 mt-2">Rapid "One-Click" sign-offs for pending mentee requests.</p>
         </div>
-        
-        <div className="flex items-center gap-2 bg-[#F5F5F0] px-5 py-3 rounded-full shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] border border-white/60">
-          <Clock size={18} className="text-[#FDBA74]" />
+
+        <div className="flex items-center gap-2 bg-[#FFFFFF] px-5 py-3 rounded-full border border-slate-200">
+          <Clock size={18} className="text-[#8C6A31]" />
           <span className="font-bold text-slate-700">{loading ? "..." : requests.length} Pending</span>
         </div>
       </div>
@@ -189,16 +194,16 @@ export default function PriorityQueuePage() {
       <div className="space-y-8">
         <AnimatePresence>
           {loading ? (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-10">
+            <motion.div initial={false} animate={{ opacity: 1 }} className="text-center py-10">
               <p className="text-slate-500 font-medium">Loading pending requests...</p>
             </motion.div>
           ) : requests.length === 0 ? (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
+            <motion.div
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
-              className="text-center py-20 bg-[#F5F5F0] rounded-[3rem] shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white/60"
+              className="text-center py-20 bg-[#FFFFFF] rounded-lg border border-slate-200"
             >
-              <div className="w-20 h-20 mx-auto bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-4 shadow-[inset_2px_2px_4px_rgba(0,0,0,0.02),inset_-2px_-2px_4px_rgba(255,255,255,0.5)]">
+              <div className="w-20 h-20 mx-auto bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mb-4 border border-slate-200">
                 <CheckCircle size={40} />
               </div>
               <h3 className="text-2xl font-bold text-slate-700">All Caught Up!</h3>
@@ -206,25 +211,25 @@ export default function PriorityQueuePage() {
             </motion.div>
           ) : (
             requests.map((req) => (
-              <motion.div 
+              <motion.div
                 key={req.reactKey}
                 layout
-                initial={{ opacity: 0, scale: 0.95 }}
+                initial={false}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95, x: 100 }}
                 transition={{ duration: 0.3 }}
-                className="bg-[#F5F5F0] p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white/60 flex flex-col gap-6"
+                className="bg-[#FFFFFF] p-6 md:p-8 rounded-lg md:rounded-lg border border-slate-200 flex flex-col gap-6"
               >
-                
+
                 {/* Card Header: Student Info */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200/50 gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-[#60A5FA]/10 text-[#60A5FA] flex items-center justify-center shadow-[inset_2px_2px_4px_rgba(0,0,0,0.02),inset_-2px_-2px_4px_rgba(255,255,255,0.5)]">
+                    <div className="w-12 h-12 rounded-full bg-[#17685E]/10 text-[#17685E] flex items-center justify-center border border-slate-200">
                       <UserCircle size={24} />
                     </div>
                     <div>
                       <h4 className="font-bold text-slate-700 text-lg">{req.studentName}</h4>
-                      <p className="text-xs font-medium text-slate-400">{req.uid}</p>
+                      <p className="text-xs font-medium text-slate-500">{req.uid}</p>
                     </div>
                   </div>
                 </div>
@@ -235,22 +240,22 @@ export default function PriorityQueuePage() {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-1 gap-2">
                     <h3 className="text-xl font-bold text-slate-700 mb-1">{req.title}</h3>
                     </div>
-                    <p className="text-sm font-medium text-[#60A5FA] mb-4">{req.type}</p>
-                    
+                    <p className="text-sm font-medium text-[#17685E] mb-4">{req.type}</p>
+
                     <div className="space-y-2 text-sm text-slate-500 font-medium">
                       <div className="flex items-center gap-2">
-                        <Calendar size={16} className="text-slate-400" />
+                        <Calendar size={16} className="text-slate-500" />
                         {req.date}
                       </div>
                       <div className="flex items-center gap-2">
-                        <MapPin size={16} className="text-slate-400" />
+                        <MapPin size={16} className="text-slate-500" />
                         {req.location}
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-[#F5F5F0] p-5 rounded-2xl shadow-[inset_4px_4px_8px_rgba(0,0,0,0.03),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] flex items-start gap-3">
-                    <FileText size={18} className="text-slate-400 flex-shrink-0 mt-0.5" />
+                  <div className="bg-[#FFFFFF] p-5 rounded-lg border border-slate-200 flex items-start gap-3">
+                    <FileText size={18} className="text-slate-500 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-sm text-slate-600 leading-relaxed italic">
                         "{req.desc}"
@@ -258,7 +263,7 @@ export default function PriorityQueuePage() {
                       {req.proofLink && (
                         <div className="mt-3 pt-3 border-t border-slate-200/50">
                           <p className="text-xs font-bold text-slate-500 mb-1">Attached Proof:</p>
-                          <a href={req.proofLink && !/^https?:\/\//i.test(req.proofLink) ? `https://${req.proofLink}` : req.proofLink!} target="_blank" rel="noopener noreferrer" className="text-sm text-[#60A5FA] hover:underline font-medium break-all">
+                          <a href={req.proofLink && !/^https?:\/\//i.test(req.proofLink) ? `https://${req.proofLink}` : req.proofLink!} target="_blank" rel="noopener noreferrer" className="text-sm text-[#17685E] hover:underline font-medium break-all">
                             {req.proofLink}
                           </a>
                         </div>
@@ -269,37 +274,33 @@ export default function PriorityQueuePage() {
 
                 {/* Card Footer: Feedback & Actions */}
                 <div className="flex flex-col md:flex-row gap-6 mt-2 pt-6 border-t border-slate-200/50">
-                  
+
                   {/* Feedback Box */}
                   <div className="flex-1 relative">
-                    <div className="absolute left-4 top-4 text-slate-400">
+                    <div className="absolute left-4 top-4 text-slate-500">
                       <MessageSquare size={18} />
                     </div>
-                    <textarea 
+                    <textarea
                       rows={2}
                       value={feedbacks[req.reactKey] || ""}
                       onChange={(e) => handleFeedbackChange(req.reactKey, e.target.value)}
                       placeholder="Add an optional note to the student..."
-                      className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-2xl py-3 pl-12 pr-4 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-slate-600 placeholder:text-slate-300 border-none resize-none text-sm"
+                      className="w-full bg-[#FFFFFF] border border-slate-200 rounded-lg py-3 pl-12 pr-4 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-slate-600 placeholder:text-slate-300 border-none resize-none text-sm"
                     />
                   </div>
 
                   {/* Action Pills */}
                   <div className="flex items-center gap-3 shrink-0">
-                    <motion.button 
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                    <motion.button
                       onClick={() => handleAction(req.reactKey, "reject", req.status)}
-                      className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[#F5F5F0] shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] text-rose-500 hover:bg-rose-500 hover:text-white transition-all font-bold text-sm border border-white/60"
+                      className="flex items-center gap-2 px-6 py-4 rounded-lg bg-[#FFFFFF] border border-slate-200 text-rose-500 hover:bg-rose-500 hover:text-white transition-all font-bold text-sm border border-slate-200"
                     >
                       <XCircle size={18} /> Reject
                     </motion.button>
-                    
-                    <motion.button 
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+
+                    <motion.button
                       onClick={() => handleAction(req.reactKey, "approve", req.status)}
-                      className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all font-bold text-sm"
+                      className="flex items-center gap-2 px-6 py-4 rounded-lg bg-emerald-500 text-white    transition-all font-bold text-sm"
                     >
                       <CheckCircle size={18} /> {req.status === "Pending" ? "Initial Approve" : "Verify Proof"}
                     </motion.button>

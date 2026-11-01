@@ -41,7 +41,7 @@ export async function updatePassword(table: "students" | "staff" | "hods", newPa
 
   const uid = (session.user as any).uid;
   const role = (session.user as any).role;
-  
+
   // Ensure they are updating their own correct table
   if (table === "students" && role !== "student") throw new Error("Unauthorized");
   if (table === "staff" && role !== "staff") throw new Error("Unauthorized");

@@ -1,84 +1,69 @@
 /**
- * One-time migration script to hash all existing plain-text passwords
- * in students, staff, and hods tables.
- * 
- * Run with: node scripts/hash-passwords.mjs
- * 
- * This is safe to run multiple times — it skips already-hashed passwords.
+ * scripts/hash-passwords.mjs
+ *
+ * One-time migration script: fetches all users whose passwords are plain-text
+ * and replaces them with bcrypt hashes.
+ *
+ * Usage:
+ *   MONGODB_URI=mongodb+srv://... node scripts/hash-passwords.mjs
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { MongoClient } from "mongodb";
 import bcrypt from "bcryptjs";
-import { config } from "dotenv";
+import nextEnv from "@next/env";
+import { configureMongoDns } from "../lib/mongodb-dns.mjs";
 
-config({ path: ".env.local" });
+nextEnv.loadEnvConfig(process.cwd());
+configureMongoDns();
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_DB = process.env.MONGODB_DB || "campulse";
 
-const SALT_ROUNDS = 10;
-
-async function hashTablePasswords(table, pkColumn) {
-  console.log(`\n🔐 Processing ${table}...`);
-
-  const { data: rows, error } = await supabase
-    .from(table)
-    .select(`${pkColumn}, password`);
-
-  if (error) {
-    console.error(`  ❌ Error fetching ${table}:`, error.message);
-    return;
-  }
-
-  let hashed = 0;
-  let skipped = 0;
-  let empty = 0;
-
-  for (const row of rows) {
-    // Skip if no password set
-    if (!row.password) {
-      empty++;
-      continue;
-    }
-
-    // Skip if already a bcrypt hash (starts with $2a$ or $2b$)
-    if (row.password.startsWith("$2")) {
-      skipped++;
-      continue;
-    }
-
-    // Hash the plain-text password
-    const hash = await bcrypt.hash(row.password, SALT_ROUNDS);
-    const { error: updateErr } = await supabase
-      .from(table)
-      .update({ password: hash })
-      .eq(pkColumn, row[pkColumn]);
-
-    if (updateErr) {
-      console.error(`  ❌ Failed to hash ${row[pkColumn]}:`, updateErr.message);
-    } else {
-      hashed++;
-    }
-  }
-
-  console.log(`  ✅ ${hashed} passwords hashed`);
-  console.log(`  ⏭️  ${skipped} already hashed (skipped)`);
-  console.log(`  ⚠️  ${empty} have no password set`);
+if (!MONGODB_URI) {
+  console.error("❌ MONGODB_URI is not set.");
+  process.exit(1);
 }
 
-async function main() {
-  console.log("═══════════════════════════════════════");
-  console.log("  CamPulse Password Hashing Migration");
-  console.log("═══════════════════════════════════════");
+const TABLES = [
+  { collection: "students", pk: "uid" },
+  { collection: "staff",    pk: "suid" },
+  { collection: "hods",     pk: "huid" },
+];
 
-  await hashTablePasswords("students", "uid");
-  await hashTablePasswords("staff", "suid");
-  await hashTablePasswords("hods", "huid");
+async function run() {
+  const client = new MongoClient(MONGODB_URI);
+  await client.connect();
+  console.log("✅ Connected to MongoDB");
 
-  console.log("\n✅ Migration complete! All passwords are now securely hashed.");
-  console.log("   Users can log in with their same passwords — no changes needed on their end.");
+  const db = client.db(MONGODB_DB);
+
+  for (const { collection: collName, pk } of TABLES) {
+    const coll = db.collection(collName);
+    const rows = await coll.find({ password: { $exists: true } }).toArray();
+
+    console.log(`\n📦 Processing "${collName}" — ${rows.length} records`);
+
+    let updated = 0;
+    for (const row of rows) {
+      if (!row.password) continue;
+
+      // Already hashed — bcrypt hashes start with $2
+      if (String(row.password).startsWith("$2")) continue;
+
+      const hash = await bcrypt.hash(row.password, 10);
+      await coll.updateOne({ [pk]: row[pk] }, { $set: { password: hash } });
+      updated++;
+      process.stdout.write(".");
+    }
+
+    console.log(`\n  ✅ Updated ${updated} plain-text passwords in "${collName}".`);
+  }
+
+  await client.close();
+  console.log("\n🎉 Password hashing complete!");
 }
 
-main().catch(console.error);
+run().catch((err) => {
+  console.error("Error:", err);
+  process.exit(1);
+});

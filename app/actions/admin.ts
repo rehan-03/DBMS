@@ -16,7 +16,7 @@ export async function adminUpdateRecord(table: string, pkColumn: string, pkValue
 
   const { error } = await supabaseServer.from(table).update(payload).eq(pkColumn, pkValue);
   if (error) throw new Error(error.message);
-  
+
   return { success: true };
 }
 

@@ -10,7 +10,7 @@ export async function createBroadcast(payload: any) {
   try {
     console.log("[createBroadcast] Starting broadcast creation with payload:", JSON.stringify(payload));
     const session = await getServerSession(authOptions);
-    
+
     if (!session || (session.user as any).role !== "hod") {
       console.warn("[createBroadcast] Unauthorized attempt.");
       return { success: false, error: "Unauthorized: Only HODs can broadcast." };
@@ -18,19 +18,19 @@ export async function createBroadcast(payload: any) {
 
     console.log("[createBroadcast] Inserting into Supabase 'broadcasts' table...");
     const { data, error } = await supabaseServer.from("broadcasts").insert([payload]).select().single();
-    
+
     if (error) {
       console.error("[createBroadcast] Supabase Insert Error:", error);
       return { success: false, error: error.message };
     }
-    
+
     console.log("[createBroadcast] Broadcast created successfully. Data ID:", data?.id);
-    
+
     // Revalidate paths that might show broadcasts
     revalidatePath("/hod/broadcasts");
     revalidatePath("/staff");
     revalidatePath("/student");
-    
+
     return { success: true, data };
   } catch (error: any) {
     console.error("[createBroadcast] Unexpected Server Exception:", error);

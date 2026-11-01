@@ -1,11 +1,13 @@
 "use client";
-import { getSession, signOut } from "next-auth/react";
+import { signOut } from "next-auth/react";
+import { getSession } from "@/lib/client-session";
 
 
 import React, { useState, useEffect, Suspense } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import { Users, Plus, Edit, ChevronLeft, Activity, CheckCircle, Clock, XCircle, FileSpreadsheet, X, Search, Download, Trash2 } from "lucide-react";
 import { supabase } from "@/app/student/supabase";
+import { startActivityRefresh } from "@/lib/activity-refresh";
 import { upsertStudent, deleteStudent } from "@/app/actions/users";
 import { fetchMyStaffProfile, fetchStudentsByDepartment } from "@/app/actions/reads";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -56,6 +58,7 @@ function MenteeManagementContent() {
   useEffect(() => {
     if (drilldownUid) {
       fetchStudentDrilldown(drilldownUid);
+      return startActivityRefresh(() => fetchStudentDrilldown(drilldownUid, true));
     }
   }, [drilldownUid, mentees]);
 
@@ -71,7 +74,7 @@ function MenteeManagementContent() {
 
         // Fetch divisions this staff coordinates
         const { data: coords } = await supabase.from("class_coordinators").select("division").eq("suid", suid);
-        const divisions = coords?.map(c => c.division) || [];
+        const divisions = coords?.map((c: any) => c.division) || [];
         setMyDivisions(divisions);
 
         const { data: students, error: studentsError } = await fetchStudentsByDepartment(String(staff.department_id));
@@ -88,8 +91,8 @@ function MenteeManagementContent() {
     }
   };
 
-  const fetchStudentDrilldown = async (uid: string) => {
-    setLoadingActivities(true);
+  const fetchStudentDrilldown = async (uid: string, background = false) => {
+    if (!background) setLoadingActivities(true);
     const student = mentees.find(m => m.uid === uid);
     if (student) setDrilldownStudent(student);
 
@@ -101,7 +104,7 @@ function MenteeManagementContent() {
           group_activities ( id, title, description, created_at )
         `)
         .eq("student_uid", uid);
-      
+
       if (participations) {
         const acts = participations.map((p: any) => ({
           id: p.group_activities?.id || Math.random().toString(),
@@ -109,7 +112,7 @@ function MenteeManagementContent() {
           description: p.group_activities?.description || '',
           status: p.status,
           created_at: p.group_activities?.created_at || new Date().toISOString()
-        })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        })).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setStudentActivities(acts);
       }
     } catch (error) {
@@ -123,10 +126,10 @@ function MenteeManagementContent() {
   const handleOpenModal = (student: any = null) => {
     if (student) {
       setEditingStudent(student);
-      setFormData({ 
-        uid: student.uid, 
-        name: student.name, 
-        division: student.division || "", 
+      setFormData({
+        uid: student.uid,
+        name: student.name,
+        division: student.division || "",
         dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : "",
         gender: student.gender || "",
         semester: student.semester || "",
@@ -136,7 +139,7 @@ function MenteeManagementContent() {
       });
     } else {
       setEditingStudent(null);
-      setFormData({ 
+      setFormData({
         uid: "", name: "", division: myDivisions[0] || "", dob: "",
         gender: "", semester: "", year_id: "", password: "",
         batch: "",
@@ -279,8 +282,8 @@ function MenteeManagementContent() {
     }
   };
 
-  const filteredMentees = mentees.filter(m => 
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredMentees = mentees.filter(m =>
+    m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.uid.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -298,55 +301,55 @@ function MenteeManagementContent() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      
+
       {/* --- View: Drilldown --- */}
       {drilldownUid ? (
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
-          <button 
+        <motion.div initial={false} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+          <button
             onClick={() => router.push("/staff/mentees")}
-            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#60A5FA] transition-colors"
+            className="flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-[#17685E] transition-colors"
           >
             <ChevronLeft size={16} /> Back to Roster
           </button>
 
-          <div className="bg-[#F5F5F0] p-8 rounded-[2.5rem] shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white/60 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="bg-[#FFFFFF] p-8 rounded-lg border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h2 className="text-3xl font-bold text-slate-800">{drilldownStudent?.name || "Student"}</h2>
-              <p className="text-[#60A5FA] font-medium tracking-wide mt-1">{drilldownUid} • Division {drilldownStudent?.division}</p>
+              <h1 className="text-3xl font-bold text-slate-800">{drilldownStudent?.name || "Student"}</h1>
+              <p className="text-[#17685E] font-medium tracking-wide mt-1">{drilldownUid} • Division {drilldownStudent?.division}</p>
             </div>
             <div className="flex gap-4">
-              <div className="text-center px-6 py-3 bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-2xl">
-                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Total Logs</p>
+              <div className="text-center px-6 py-3 bg-[#FFFFFF] border border-slate-200 rounded-lg">
+                <p className="text-xs normal-case tracking-normal text-slate-500 font-bold">Total Logs</p>
                 <p className="text-xl font-bold text-slate-700">{studentActivities.length}</p>
               </div>
             </div>
           </div>
 
           <h3 className="text-xl font-bold text-slate-700 flex items-center gap-2">
-            <Activity size={20} className="text-[#60A5FA]" /> Activity Timeline
+            <Activity size={20} className="text-[#17685E]" /> Activity Timeline
           </h3>
 
           {loadingActivities ? (
              <p className="text-slate-500">Loading timeline...</p>
           ) : studentActivities.length === 0 ? (
-            <div className="bg-[#F5F5F0] p-12 rounded-[2rem] text-center shadow-[inset_4px_4px_8px_rgba(0,0,0,0.03),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]">
-              <p className="text-slate-400 font-medium">This student has not logged any activities yet.</p>
+            <div className="bg-[#FFFFFF] p-12 rounded-lg text-center border border-slate-200">
+              <p className="text-slate-500 font-medium">This student has not logged any activities yet.</p>
             </div>
           ) : (
-            <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-[#60A5FA] before:to-transparent">
+            <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-[#17685E] before:to-transparent">
               {studentActivities.map((act) => (
                 <div key={act.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-[#F5F5F0] bg-[#60A5FA] text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-[#FFFFFF] bg-[#17685E] text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                     {act.status === "Approved" ? <CheckCircle size={16} /> : act.status === "Rejected" ? <XCircle size={16} /> : <Clock size={16} />}
                   </div>
-                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-[#F5F5F0] p-5 rounded-3xl shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white/60">
+                  <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-[#FFFFFF] p-5 rounded-lg border border-slate-200">
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-bold text-slate-700">{act.title}</h4>
-                      <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${act.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : act.status === 'Rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                      <span className={`text-xs font-semibold normal-case tracking-normal px-3 py-1 rounded-full ${act.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : act.status === 'Rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                         {act.status}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 font-medium mb-3 flex items-center gap-1">
+                    <p className="text-xs text-slate-500 font-medium mb-3 flex items-center gap-1">
                       <Clock size={12} /> {new Date(act.created_at).toLocaleDateString()}
                     </p>
                     <p className="text-sm text-slate-600 line-clamp-2">{act.description}</p>
@@ -358,28 +361,28 @@ function MenteeManagementContent() {
         </motion.div>
       ) : (
         /* --- View: Roster --- */
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-          
+        <motion.div initial={false} animate={{ opacity: 1 }} className="space-y-8">
+
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
-                <Users className="text-[#60A5FA]" size={36} /> Mentee <span className="text-[#60A5FA]">Management</span>
+                <Users className="text-[#17685E]" size={36} /> Mentee <span className="text-[#17685E]">Management</span>
               </h2>
               <p className="text-slate-500 mt-2">Manage your assigned students and track their engagement.</p>
             </div>
-            
+
             <div className="flex flex-wrap items-center gap-3">
-              <button onClick={handleDownloadTemplate} className="bg-[#F5F5F0] text-slate-600 px-5 py-3 rounded-full font-semibold shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white/60 hover:text-emerald-500 transition-colors flex items-center gap-2">
+              <button onClick={handleDownloadTemplate} className="bg-[#FFFFFF] text-slate-600 px-5 py-3 rounded-full font-semibold border border-slate-200 hover:text-emerald-500 transition-colors flex items-center gap-2">
                 <Download size={18} /> Download Template
               </button>
-              <label className="cursor-pointer bg-[#F5F5F0] text-slate-600 px-5 py-3 rounded-full font-semibold shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white/60 hover:text-emerald-500 transition-colors flex items-center gap-2 relative">
+              <label className="cursor-pointer bg-[#FFFFFF] text-slate-600 px-5 py-3 rounded-full font-semibold border border-slate-200 hover:text-emerald-500 transition-colors flex items-center gap-2 relative">
                 <FileSpreadsheet size={18} />
                 {importing ? "Importing..." : "Import .xlsx"}
                 <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileUpload} className="hidden" disabled={importing} />
               </label>
-              <button 
+              <button
                 onClick={() => handleOpenModal()}
-                className="bg-[#60A5FA] text-white px-5 py-3 rounded-full font-semibold shadow-lg shadow-[#60A5FA]/30 hover:shadow-[#60A5FA]/50 transition-all flex items-center gap-2"
+                className="bg-[#17685E] text-white px-5 py-3 rounded-full font-semibold  border border-slate-200 transition-all flex items-center gap-2"
               >
                 <Plus size={18} /> Add Mentee
               </button>
@@ -388,50 +391,50 @@ function MenteeManagementContent() {
 
           {/* Search Bar */}
           <div className="relative max-w-md">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-500">
               <Search size={18} />
             </div>
-            <input 
-              type="text" 
-              placeholder="Search by name or UID..." 
+            <input
+              type="text"
+              placeholder="Search by name or UID..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 pl-12 pr-6 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-sm text-slate-600 border-none"
+              className="w-full bg-[#FFFFFF] border border-slate-200 rounded-full py-3 pl-12 pr-6 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-sm text-slate-600 border-none"
             />
           </div>
 
           {/* Roster Grid */}
-          <motion.div variants={containerVars} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <motion.div variants={containerVars} initial={false} animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMentees.length === 0 && (
-              <div className="col-span-full py-12 text-center text-slate-400 font-medium">No students found.</div>
+              <div className="col-span-full py-12 text-center text-slate-500 font-medium">No students found.</div>
             )}
             {filteredMentees.map((student) => {
               const isMyMentee = myDivisions.includes(student.division);
               return (
-                <motion.div 
+                <motion.div
                   variants={itemVars} key={student.uid}
-                  className={`p-6 rounded-[2rem] bg-[#F5F5F0] shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white/60 relative group transition-all ${isMyMentee ? 'hover:shadow-[inset_4px_4px_8px_rgba(0,0,0,0.03),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]' : 'opacity-70 grayscale-[0.5]'}`}
+                  className={`p-6 rounded-lg bg-[#FFFFFF] border border-slate-200 relative group transition-all ${isMyMentee ? 'border border-slate-200' : 'opacity-70 grayscale-[0.5]'}`}
                 >
-                  {!isMyMentee && <span className="absolute top-4 right-4 text-[10px] font-bold text-slate-400 uppercase">Other Div</span>}
-                  
+                  {!isMyMentee && <span className="absolute top-4 right-4 text-xs font-bold text-slate-500 normal-case">Other Div</span>}
+
                   <div className="mb-4">
                     <h3 className="text-lg font-bold text-slate-700">{student.name}</h3>
-                    <p className="text-sm font-medium text-[#60A5FA]">{student.uid}</p>
+                    <p className="text-sm font-medium text-[#17685E]">{student.uid}</p>
                   </div>
-                  
+
                   <div className="flex gap-2 mb-6">
-                    <span className="text-[10px] font-bold uppercase tracking-widest bg-slate-200 text-slate-500 px-3 py-1 rounded-full">Div {student.division || "N/A"}</span>
+                    <span className="text-xs font-bold normal-case tracking-normal bg-slate-200 text-slate-500 px-3 py-1 rounded-full">Div {student.division || "N/A"}</span>
                   </div>
 
                   <div className="flex items-center justify-between pt-4 border-t border-slate-200/50">
-                    <button onClick={() => router.push(`/staff/mentees?id=${student.uid}`)} className="text-xs font-bold text-slate-500 hover:text-[#60A5FA] transition-colors flex items-center gap-1">
+                    <button onClick={() => router.push(`/staff/mentees?id=${student.uid}`)} className="text-xs font-bold text-slate-500 hover:text-[#17685E] transition-colors flex items-center gap-1">
                       <Activity size={14}/> View Logs
                     </button>
                     <div className="flex gap-2">
-                      <button onClick={() => handleOpenModal(student)} title="Edit Student" className="w-8 h-8 rounded-full bg-[#F5F5F0] shadow-[4px_4px_8px_rgba(0,0,0,0.05),-4px_-4px_8px_rgba(255,255,255,0.8)] hover:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.05),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-400 hover:text-amber-500 transition-all">
+                      <button onClick={() => handleOpenModal(student)} title="Edit Student" className="w-8 h-8 rounded-full bg-[#FFFFFF] border border-slate-200 flex items-center justify-center text-slate-500 hover:text-amber-500 transition-all">
                         <Edit size={14} />
                       </button>
-                      <button onClick={() => handleDeleteStudent(student.uid)} title="Delete Student" className="w-8 h-8 rounded-full bg-[#F5F5F0] shadow-[4px_4px_8px_rgba(0,0,0,0.05),-4px_-4px_8px_rgba(255,255,255,0.8)] hover:shadow-[inset_2px_2px_4px_rgba(0,0,0,0.05),inset_-2px_-2px_4px_rgba(255,255,255,0.8)] flex items-center justify-center text-slate-400 hover:text-rose-500 transition-all">
+                      <button onClick={() => handleDeleteStudent(student.uid)} title="Delete Student" className="w-8 h-8 rounded-full bg-[#FFFFFF] border border-slate-200 flex items-center justify-center text-slate-500 hover:text-rose-500 transition-all">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -446,38 +449,38 @@ function MenteeManagementContent() {
       {/* --- Add/Edit Modal --- */}
       <AnimatePresence>
         {isModalOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          <motion.div
+            initial={false} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/20  z-50 flex items-center justify-center p-4"
           >
             <motion.div
-              initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
-              className="bg-[#F5F5F0] p-8 rounded-[2.5rem] shadow-2xl border border-white/60 w-full max-w-md"
+              initial={false} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-[#FFFFFF] p-8 rounded-lg  border border-slate-200 w-full max-w-md"
             >
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-2xl font-bold text-slate-800">{editingStudent ? "Edit Student" : "Add Mentee"}</h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-rose-500">
+                <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-rose-500">
                   <X size={24} />
                 </button>
               </div>
 
               <form onSubmit={handleSaveStudent} className="space-y-5">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-4">UID</label>
-                  <input required disabled={!!editingStudent} type="text" value={formData.uid} onChange={e => setFormData({...formData, uid: e.target.value.toUpperCase()})} placeholder="e.g. 322CE001" className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-slate-600 disabled:opacity-50 border-none" />
+                  <label className="text-xs font-bold text-slate-500 normal-case tracking-normal ml-4">UID</label>
+                  <input required disabled={!!editingStudent} type="text" value={formData.uid} onChange={e => setFormData({...formData, uid: e.target.value.toUpperCase()})} placeholder="e.g. 322CE001" className="w-full bg-[#FFFFFF] border border-slate-200 rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-slate-600 disabled:opacity-50 border-none" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-4">Full Name</label>
-                  <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Student's full name" className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-slate-600 border-none" />
+                  <label className="text-xs font-bold text-slate-500 normal-case tracking-normal ml-4">Full Name</label>
+                  <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Student's full name" className="w-full bg-[#FFFFFF] border border-slate-200 rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-slate-600 border-none" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-4">Date of Birth</label>
-                    <input type="date" value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-slate-600 border-none" />
+                    <label className="text-xs font-bold text-slate-500 normal-case tracking-normal ml-4">Date of Birth</label>
+                    <input type="date" value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} className="w-full bg-[#FFFFFF] border border-slate-200 rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-slate-600 border-none" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-4">Gender</label>
-                    <select value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-slate-600 border-none appearance-none">
+                    <label className="text-xs font-bold text-slate-500 normal-case tracking-normal ml-4">Gender</label>
+                    <select value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} className="w-full bg-[#FFFFFF] border border-slate-200 rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-slate-600 border-none appearance-none">
                       <option value="">Select...</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
@@ -487,29 +490,29 @@ function MenteeManagementContent() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-4">Division</label>
-                    <input required type="text" value={formData.division} onChange={e => setFormData({...formData, division: e.target.value})} placeholder="e.g. A" className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-slate-600 border-none" />
+                    <label className="text-xs font-bold text-slate-500 normal-case tracking-normal ml-4">Division</label>
+                    <input required type="text" value={formData.division} onChange={e => setFormData({...formData, division: e.target.value})} placeholder="e.g. A" className="w-full bg-[#FFFFFF] border border-slate-200 rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-slate-600 border-none" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-4">Semester</label>
-                    <input type="number" value={formData.semester} onChange={e => setFormData({...formData, semester: e.target.value ? parseInt(e.target.value) : ""})} placeholder="e.g. 4" className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-slate-600 border-none" />
+                    <label className="text-xs font-bold text-slate-500 normal-case tracking-normal ml-4">Semester</label>
+                    <input type="number" value={formData.semester} onChange={e => setFormData({...formData, semester: e.target.value ? parseInt(e.target.value) : ""})} placeholder="e.g. 4" className="w-full bg-[#FFFFFF] border border-slate-200 rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-slate-600 border-none" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-4">Year ID</label>
-                    <input type="text" value={formData.year_id} onChange={e => setFormData({...formData, year_id: e.target.value})} placeholder="e.g. SE" className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-slate-600 border-none" />
+                    <label className="text-xs font-bold text-slate-500 normal-case tracking-normal ml-4">Year ID</label>
+                    <input type="text" value={formData.year_id} onChange={e => setFormData({...formData, year_id: e.target.value})} placeholder="e.g. SE" className="w-full bg-[#FFFFFF] border border-slate-200 rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-slate-600 border-none" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-4">Batch</label>
-                    <input type="text" value={formData.batch} onChange={e => setFormData({...formData, batch: e.target.value})} placeholder="e.g. 2022-2026" className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-slate-600 border-none" />
+                    <label className="text-xs font-bold text-slate-500 normal-case tracking-normal ml-4">Batch</label>
+                    <input type="text" value={formData.batch} onChange={e => setFormData({...formData, batch: e.target.value})} placeholder="e.g. 2022-2026" className="w-full bg-[#FFFFFF] border border-slate-200 rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-slate-600 border-none" />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-4">Password</label>
-                  <input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder={editingStudent ? "Leave blank to keep unchanged" : "Set initial password"} className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#60A5FA]/30 transition-all text-slate-600 border-none" />
+                  <label className="text-xs font-bold text-slate-500 normal-case tracking-normal ml-4">Password</label>
+                  <input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder={editingStudent ? "Leave blank to keep unchanged" : "Set initial password"} className="w-full bg-[#FFFFFF] border border-slate-200 rounded-full py-3 px-5 outline-none focus:ring-2 focus:ring-[#17685E]/30 transition-all text-slate-600 border-none" />
                 </div>
-                <motion.button disabled={saving} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} type="submit" className="w-full bg-[#60A5FA] text-white font-bold py-4 rounded-full shadow-lg shadow-[#60A5FA]/30 hover:shadow-[#60A5FA]/50 transition-all mt-6">
+                <motion.button disabled={saving} type="submit" className="w-full bg-[#17685E] text-white font-bold py-4 rounded-full  border border-slate-200 transition-all mt-6">
                   {saving ? "Saving..." : "Save Student"}
                 </motion.button>
               </form>
@@ -521,13 +524,13 @@ function MenteeManagementContent() {
       {/* --- Delete Confirmation Modal --- */}
       <AnimatePresence>
         {isDeleteModalOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          <motion.div
+            initial={false} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/20  z-50 flex items-center justify-center p-4"
           >
             <motion.div
-              initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
-              className="bg-[#F5F5F0] p-8 rounded-[2.5rem] shadow-2xl border border-white/60 w-full max-w-md text-center"
+              initial={false} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-[#FFFFFF] p-8 rounded-lg  border border-slate-200 w-full max-w-md text-center"
             >
               <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 size={32} />
@@ -540,14 +543,14 @@ function MenteeManagementContent() {
                 <button
                   onClick={() => setIsDeleteModalOpen(false)}
                   disabled={deleting}
-                  className="flex-1 bg-white text-slate-600 font-bold py-4 rounded-full shadow-sm hover:bg-slate-50 transition-all border border-slate-200"
+                  className="flex-1 bg-white text-slate-600 font-bold py-4 rounded-full  hover:bg-slate-50 transition-all border border-slate-200"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDeleteStudent}
                   disabled={deleting}
-                  className="flex-1 bg-rose-500 text-white font-bold py-4 rounded-full shadow-lg shadow-rose-500/30 hover:shadow-rose-500/50 transition-all"
+                  className="flex-1 bg-rose-500 text-white font-bold py-4 rounded-full    transition-all"
                 >
                   {deleting ? "Deleting..." : "Delete"}
                 </button>
@@ -560,13 +563,13 @@ function MenteeManagementContent() {
       {/* --- Import Confirmation Modal --- */}
       <AnimatePresence>
         {isImportModalOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          <motion.div
+            initial={false} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/20  z-50 flex items-center justify-center p-4"
           >
             <motion.div
-              initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
-              className="bg-[#F5F5F0] p-8 rounded-[2.5rem] shadow-2xl border border-white/60 w-full max-w-2xl text-center"
+              initial={false} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-[#FFFFFF] p-8 rounded-lg  border border-slate-200 w-full max-w-2xl text-center"
             >
               <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <FileSpreadsheet size={32} />
@@ -575,12 +578,12 @@ function MenteeManagementContent() {
               <p className="text-slate-500 mb-4">
                 You are about to import or update <span className="font-bold text-slate-700">{importPayload.length}</span> students from the selected file. Do you want to proceed?
               </p>
-              
+
               {importPayload.length > 0 && (
-                <div className="mt-4 mb-8 text-left bg-white/50 rounded-2xl overflow-hidden border border-slate-200/60 shadow-[inset_4px_4px_8px_rgba(0,0,0,0.03),inset_-4px_-4px_8px_rgba(255,255,255,0.8)]">
+                <div className="mt-4 mb-8 text-left bg-white/50 rounded-lg overflow-hidden border border-slate-200/60 border border-slate-200">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm text-slate-600">
-                      <thead className="bg-[#F5F5F0] border-b border-slate-200/60 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                      <thead className="bg-[#FFFFFF] border-b border-slate-200/60 text-slate-500 font-bold normal-case tracking-normal text-xs">
                         <tr>
                           <th className="px-4 py-3 text-left">UID</th>
                           <th className="px-4 py-3 text-left">Name</th>
@@ -590,10 +593,10 @@ function MenteeManagementContent() {
                       <tbody className="divide-y divide-slate-200/50">
                         {importPayload.slice(0, 5).map((student, idx) => (
                           <tr key={idx} className="hover:bg-white/40 transition-colors">
-                            <td className="px-4 py-3 font-bold text-[#60A5FA]">{student.uid}</td>
+                            <td className="px-4 py-3 font-bold text-[#17685E]">{student.uid}</td>
                             <td className="px-4 py-3 font-medium">{student.name}</td>
                             <td className="px-4 py-3 text-center">
-                              <span className="bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">{student.division || '-'}</span>
+                              <span className="bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full text-xs font-bold normal-case">{student.division || '-'}</span>
                             </td>
                           </tr>
                         ))}
@@ -601,7 +604,7 @@ function MenteeManagementContent() {
                     </table>
                   </div>
                   {importPayload.length > 5 && (
-                    <div className="px-4 py-3 bg-[#F5F5F0]/50 text-xs text-center text-slate-500 font-semibold border-t border-slate-200/60">
+                    <div className="px-4 py-3 bg-[#FFFFFF]/50 text-xs text-center text-slate-500 font-semibold border-t border-slate-200/60">
                       ... and {importPayload.length - 5} more students
                     </div>
                   )}
@@ -615,14 +618,14 @@ function MenteeManagementContent() {
                     setImportPayload([]);
                   }}
                   disabled={importing}
-                  className="flex-1 bg-white text-slate-600 font-bold py-4 rounded-full shadow-sm hover:bg-slate-50 transition-all border border-slate-200"
+                  className="flex-1 bg-white text-slate-600 font-bold py-4 rounded-full  hover:bg-slate-50 transition-all border border-slate-200"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmImport}
                   disabled={importing}
-                  className="flex-1 bg-emerald-500 text-white font-bold py-4 rounded-full shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all"
+                  className="flex-1 bg-emerald-500 text-white font-bold py-4 rounded-full    transition-all"
                 >
                   {importing ? "Importing..." : "Confirm"}
                 </button>

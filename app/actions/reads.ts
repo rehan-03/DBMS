@@ -21,15 +21,19 @@ function stripPasswords(data: any): any {
 
 export async function fetchMyStudentProfile() {
   const session = await getServerSession(authOptions);
-  if (!session) throw new Error("Unauthorized");
-  const uid = (session.user as any).uid;
+  if (!session) return null;
+  const role = (session.user as any)?.role;
+  if (role !== "student") return null;
+  const uid = (session.user as any)?.uid;
+  if (!uid) return null;
 
   const { data, error } = await supabaseServer
     .from("students")
     .select("*")
-    .eq("uid", uid)
-    .single();
-  if (error) throw new Error(error.message);
+    .ilike("uid", uid)
+    .maybeSingle();
+
+  if (error || !data) return null;
   return stripPasswords(data);
 }
 
@@ -43,7 +47,7 @@ export async function fetchStudentByUid(uid: string) {
       .select("*")
       .eq("uid", uid)
       .maybeSingle();
-      
+
     if (error) return { data: null, error: error.message };
     return { data: stripPasswords(data), error: null };
   } catch (err: any) {
@@ -61,7 +65,7 @@ export async function fetchStudentsByDepartment(department_id: string) {
       .select("*")
       .eq("department_id", department_id)
       .order("name", { ascending: true });
-      
+
     if (error) return { data: null, error: error.message };
     return { data: stripPasswords(data), error: null };
   } catch (err: any) {
@@ -78,7 +82,7 @@ export async function fetchStudentsByUids(uids: string[]) {
       .from("students")
       .select("uid, name")
       .in("uid", uids);
-      
+
     if (error) return { data: null, error: error.message };
     return { data, error: null }; // Passwords aren't fetched here
   } catch (err: any) {
@@ -140,15 +144,19 @@ export async function fetchStudentsWithDivision() {
 
 export async function fetchMyStaffProfile() {
   const session = await getServerSession(authOptions);
-  if (!session) throw new Error("Unauthorized");
-  const uid = (session.user as any).uid;
+  if (!session) return null;
+  const role = (session.user as any)?.role;
+  if (role !== "staff" && role !== "hod") return null;
+  const uid = (session.user as any)?.uid;
+  if (!uid) return null;
 
   const { data, error } = await supabaseServer
     .from("staff")
     .select("*")
-    .eq("suid", uid)
-    .single();
-  if (error) throw new Error(error.message);
+    .ilike("suid", uid)
+    .maybeSingle();
+
+  if (error || !data) return null;
   return stripPasswords(data);
 }
 
@@ -210,14 +218,18 @@ export async function fetchStaffByDepartment(departmentId: string) {
 
 export async function fetchMyHodProfile() {
   const session = await getServerSession(authOptions);
-  if (!session) throw new Error("Unauthorized");
-  const uid = (session.user as any).uid;
+  if (!session) return null;
+  const role = (session.user as any)?.role;
+  if (role !== "hod") return null;
+  const uid = (session.user as any)?.uid;
+  if (!uid) return null;
 
   const { data, error } = await supabaseServer
     .from("hods")
     .select("*")
-    .eq("huid", uid)
-    .single();
-  if (error) throw new Error(error.message);
+    .ilike("huid", uid)
+    .maybeSingle();
+
+  if (error || !data) return null;
   return stripPasswords(data);
 }

@@ -1,164 +1,68 @@
 "use client";
 
-import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { User, Lock, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { UserRound, LockKeyhole, ArrowRight, BookOpen, CalendarDays, ClipboardCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { signIn, getSession } from "next-auth/react";
+
+const DEMO_ACCOUNTS = [
+  { label: "Student", uid: "2023CS001", password: "student123" },
+  { label: "Faculty", uid: "STAFF101", password: "staff123" },
+  { label: "HOD", uid: "HOD101", password: "hod123" },
+];
+const WORKSPACES: Record<string, string> = { student: "/student", staff: "/staff", hod: "/hod" };
 
 export default function LandingPage() {
   const [uid, setUid] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [activeDemo, setActiveDemo] = useState<string | null>(null);
+  const [error, setError] = useState("");
   const router = useRouter();
 
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  async function login(loginUid: string, loginPassword: string, demoLabel: string | null = null) {
+    if (loading) return;
+    setLoading(true); setActiveDemo(demoLabel); setError("");
     try {
-      const normalizedId = uid.trim().toUpperCase();
-
-      const result = await signIn("credentials", {
-        uid: normalizedId,
-        password: password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        alert(result.error);
-        setLoading(false);
-        return;
-      }
-
-      // Securely fetch the session to determine the route
-      const session = await getSession();
-      if (session?.user) {
-        const role = (session.user as any).role;
-        if (role === "student") router.push("/student");
-        else if (role === "staff") router.push("/staff");
-        else if (role === "hod") router.push("/hod");
-        else router.push("/");
-      } else {
-        alert("Session creation failed");
-        setLoading(false);
-      }
+      const result = await signIn("credentials", { uid: loginUid.trim().toUpperCase(), password: loginPassword, redirect: false });
+      if (result?.error) throw new Error(result.error);
+      const session = await getSession({ broadcast: false });
+      const destination = WORKSPACES[(session?.user as { role?: string })?.role || ""];
+      if (!destination) throw new Error("Your workspace could not be opened. Please try again.");
+      router.push(destination);
     } catch (error) {
-      console.error("Login error:", error);
-      alert("An error occurred during authentication.");
-      setLoading(false);
+      setError(error instanceof Error ? error.message : "Could not sign in. Please try again.");
+      setLoading(false); setActiveDemo(null);
     }
-  };
+  }
 
-  return (
-    <main className="relative min-h-screen bg-[#F5F5F0] flex flex-col lg:flex-row items-center justify-center p-6 lg:p-24 overflow-hidden">
-      
-      {/* --- College Logo --- */}
-      <div className="absolute top-6 left-6 lg:top-10 lg:left-12 z-50">
-        <Image 
-          src="/kkw.png" 
-          alt="KKW College Logo" 
-          width={180} 
-          height={80} 
-          className="w-auto h-12 lg:h-16 object-contain"
-          priority
-        />
-      </div>
-
-      {/* --- Left Side: Hero Text --- */}
-      <motion.div 
-        initial={{ opacity: 0, x: -50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="lg:w-1/2 space-y-6 mb-12 lg:mb-0 text-center lg:text-left"
-      >
-        <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-slate-800 tracking-tight">
-          Cam<span className="text-[#7C3AED]">Pulse</span>
-        </h1>
-        {/* Visible text for Google indexing — do not remove */}
-        <p className="text-slate-500 text-sm font-semibold uppercase tracking-widest">
-          KKW College Student Portal
-        </p>
-        <p className="text-slate-600 text-lg max-w-md leading-relaxed mx-auto lg:mx-0">
-          The seamless platform for students and staff to coordinate extracurriculars, manage campus events, and sync college life.
-        </p>
-        
-      </motion.div>
-
-      {/* --- Right Side: Neumorphic Sign-In Card --- */}
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.6, delay: 0.2 }}
-        className="w-full max-w-md"
-      >
-        <div className="bg-[#F5F5F0]/80 backdrop-blur-md p-6 sm:p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white/60 relative">
-          
-          <div className="text-center mb-10">
-            <h2 className="text-2xl font-bold text-slate-700">Welcome Back</h2>
-            <p className="text-slate-500 text-sm mt-2">Sign in to your pulse account</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            {/* UID Input */}
-            <div className="space-y-2">
-              <label htmlFor="uid-input" className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-4">UID / Staff ID / HOD ID</label>
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-                  <User size={18} aria-hidden="true" />
-                </div>
-                <input 
-                  id="uid-input"
-                  type="text"
-                  value={uid}
-                  onChange={(e) => setUid(e.target.value)}
-                  className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 md:py-4 pl-12 pr-4 outline-none focus:ring-2 focus:ring-[#7C3AED]/30 transition-all text-slate-700 placeholder:text-slate-500 border-none"
-                  placeholder="e.g. 322CE001 or E12345"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Password Input */}
-            <div className="space-y-2">
-              <label htmlFor="password-input" className="text-xs font-bold text-slate-700 uppercase tracking-widest ml-4">Password</label>
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-                  <Lock size={18} aria-hidden="true" />
-                </div>
-                <input 
-                  id="password-input"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#F5F5F0] shadow-[inset_4px_4px_8px_rgba(0,0,0,0.05),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] rounded-full py-3 md:py-4 pl-12 pr-4 outline-none focus:ring-2 focus:ring-[#7C3AED]/30 transition-all text-slate-700 placeholder:text-slate-500 border-none"
-                  placeholder="Enter password"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <motion.button 
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              disabled={loading}
-              aria-label="Submit login form"
-              className="w-full bg-[#7C3AED] text-white font-bold py-3 md:py-4 rounded-full shadow-lg shadow-[#7C3AED]/30 hover:shadow-[#7C3AED]/50 transition-all flex items-center justify-center gap-2 mt-6 md:mt-4"
-            >
-              {loading ? "Authenticating..." : "Enter Workspace"}
-              <ArrowRight size={20} aria-hidden="true" />
-            </motion.button>
-          </form>
-
-          {/* Soft Footer Info */}
-          <p className="text-center text-[10px] text-slate-500 mt-8 uppercase tracking-widest leading-loose">
-            Secured by CamPulse Encryption • v2026
-          </p>
+  return <div className="login-page">
+    <header className="login-top"><div className="login-brand"><Image src="/kkw.png" alt="KKW College" width={38} height={38} priority /><span className="wordmark">CampusPulse</span></div><span>KKW College of Engineering</span></header>
+    <main className="login-main">
+      <section className="login-intro" aria-label="About CampusPulse">
+        <p>A little less paperwork. A lot more campus.</p>
+        <h2>Campus life,<br />well organised.</h2>
+        <p>One place for your activities, event proposals, and the people who help you make them happen.</p>
+        <div className="login-features">
+          <div className="login-feature"><BookOpen size={18} /><div><strong>A record that grows with you</strong><p>Log participation and keep your achievements together.</p></div></div>
+          <div className="login-feature"><CalendarDays size={18} /><div><strong>From an idea to an event</strong><p>Propose events and follow every approval.</p></div></div>
+          <div className="login-feature"><ClipboardCheck size={18} /><div><strong>Everyone on the same page</strong><p>Connect students, faculty, and your department.</p></div></div>
         </div>
-      </motion.div>
+      </section>
+      <section className="login-card" aria-labelledby="login-title">
+        <h1 id="login-title">Welcome to CampusPulse</h1>
+        <p>Sign in to your college workspace.</p>
+        {(process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_DEMO_MODE === "true") && <div className="demo-logins"><p>Explore with a demo account</p><div className="demo-login-options">{DEMO_ACCOUNTS.map(account => <button key={account.uid} type="button" disabled={loading} aria-label={`Log in as demo ${account.label}`} onClick={() => { setUid(account.uid); setPassword(account.password); void login(account.uid, account.password, account.label); }}>{activeDemo === account.label ? "Opening…" : account.label}</button>)}</div></div>}
+        <form onSubmit={event => { event.preventDefault(); void login(uid, password); }} aria-busy={loading}>
+          {error && <p className="login-form-error" role="alert">{error}</p>}
+          <div className="login-field"><label htmlFor="uid-input">College ID</label><div><UserRound size={17} aria-hidden="true" /><input id="uid-input" autoComplete="username" disabled={loading} value={uid} onChange={event => setUid(event.target.value)} placeholder="Your student, faculty, or HOD ID" required /></div></div>
+          <div className="login-field"><label htmlFor="password-input">Password</label><div><LockKeyhole size={17} aria-hidden="true" /><input id="password-input" type="password" autoComplete="current-password" disabled={loading} value={password} onChange={event => setPassword(event.target.value)} placeholder="Enter your password" required /></div></div>
+          <button type="submit" disabled={loading} className="button-primary login-submit">{loading && !activeDemo ? "Signing in…" : "Sign in to workspace"}<ArrowRight size={16} /></button>
+        </form>
+        <p className="login-card-note">Use the college ID assigned to your account.</p>
+      </section>
     </main>
-  );
+    <footer className="login-footer"><span>Made for your campus, built around you.</span><span>CampusPulse · KKW College</span></footer>
+  </div>;
 }

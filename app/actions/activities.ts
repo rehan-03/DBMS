@@ -11,6 +11,10 @@ export async function createActivity(table: "group_activities" | "staff_activiti
 
   const uid = (session.user as any).uid;
 
+  if (table === "group_activities" && mentors.length === 0) {
+    throw new Error("Select at least one faculty mentor so your activity can reach their approval queue.");
+  }
+
   // Insert main activity
   // Ownership is handled via the participant intersection tables, so we do not append uid to the parent payload.
 
@@ -70,7 +74,7 @@ export async function updateActivityStatus(activityId: string, status: string, f
   if (!session || (session.user as any).role !== "staff") throw new Error("Unauthorized");
 
   const updatePayload: any = { status };
-  // Only add feedback if the column actually exists in their schema. 
+  // Only add feedback if the column actually exists in their schema.
   // Let's assume it does if passed.
   if (feedback !== undefined) updatePayload.feedback = feedback;
 
@@ -94,7 +98,7 @@ export async function approveStudentActivity(
   if (isNewArchitecture) {
     const { error } = await supabaseServer
       .from("activity_participants")
-      .update({ status })
+      .update({ status, ...(feedback ? { feedback } : {}) })
       .match({ activity_id: activityId, student_uid: studentUid });
     if (error) throw new Error(error.message);
   } else {
@@ -138,7 +142,7 @@ export async function attachActivityProof(
     // Legacy: Store proof link in feedback, or we could just skip if legacy doesn't support it well, but let's just append to feedback
     const { error } = await supabaseServer
       .from("student_activities")
-      .update({ 
+      .update({
         status: "Proof Submitted",
         feedback: "Proof Link: " + proofLink
       })
